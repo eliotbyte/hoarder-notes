@@ -86,6 +86,9 @@
         <div class="note-footer">
           <div class="note-time clickable-link" @click="handleTimeClick(note)">
             {{ formatTime(note.createdAt) }}
+            <span v-if="note.createdAt !== note.modifiedAt" class="note-edited">
+              (edited)
+            </span>
           </div>
           <div class="note-stats">
             <n-button
