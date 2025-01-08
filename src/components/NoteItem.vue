@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div ref="noteRef">
     <!-- Placeholder for Create Mode -->
     <div v-if="isPlaceholder">
       <div class="note-placeholder" @click="switchToEditMode">
@@ -62,7 +62,6 @@
 
     <!-- View Mode -->
     <div v-else>
-      <!-- Note content -->
       <div :class="['note-content', { blurred: isDeleted }]">
         <div v-if="note.parentId" class="note-reply">
           <span class="note-reply-link" @click="handleReplyClick(note)">
@@ -85,7 +84,7 @@
         </div>
         <div class="note-footer">
           <div class="note-time clickable-link" @click="handleTimeClick(note)">
-            {{ formatTime(note.createdAt) }}
+            {{ displayedTime }}
             <span v-if="note.createdAt !== note.modifiedAt" class="note-edited">
               (edited)
             </span>
@@ -118,7 +117,6 @@
         </div>
       </div>
 
-      <!-- Overlay for deleted note -->
       <div v-if="isDeleted" class="note-overlay">
         <div class="note-overlay-content">
           <div class="note-deleted-text">Note was deleted</div>
@@ -135,11 +133,17 @@
 </template>
 
 <script>
-import { NButton, NIcon, NDropdown, NInput, useDialog } from 'naive-ui'
+import { ref, onMounted, onUnmounted } from 'vue'
+import {
+  NButton,
+  NIcon,
+  NDropdown,
+  NInput,
+} from 'naive-ui'
 import {
   ArrowUndoOutline as ReplyIcon,
   EllipsisVerticalOutline as MoreIcon,
-  Close as CloseIcon,
+  Close as CloseIcon
 } from '@vicons/ionicons5'
 import TagInput from './TagInput.vue'
 
@@ -153,41 +157,29 @@ export default {
     ReplyIcon,
     MoreIcon,
     CloseIcon,
-    TagInput,
+    TagInput
   },
   props: {
     mode: {
       type: String,
-      default: 'view',
+      default: 'view'
     },
     note: {
       type: Object,
-      default: () => ({}),
-    },
-    formatTime: {
-      type: Function,
-      required: true,
+      default: () => ({})
     },
     parentNote: {
       type: Object,
-      default: null,
+      default: null
     },
     index: {
       type: Number,
-      default: null,
+      default: null
     },
     hideReplyBlock: {
       type: Boolean,
-      default: false,
-    },
-    spaceId: {
-      type: Number,
-      default: null,
-    },
-    topicId: {
-      type: Number,
-      default: null,
-    },
+      default: false
+    }
   },
   emits: [
     'reply-click',
@@ -198,7 +190,7 @@ export default {
     'update-note',
     'cancel-create',
     'unsaved-changes',
-    'restore-note',
+    'restore-note'
   ],
   data() {
     return {
@@ -207,12 +199,12 @@ export default {
       reply: this.parentNote
         ? {
             id: this.parentNote.id,
-            textPreview: this.parentNote.text,
+            textPreview: this.parentNote.text
           }
         : this.note?.parentId
           ? {
               id: this.note.parentId,
-              textPreview: this.note.parentTextPreview,
+              textPreview: this.note.parentTextPreview
             }
           : null,
       editingState:
@@ -222,10 +214,10 @@ export default {
       dropdownOptions: [
         { label: 'Reply', key: 'reply' },
         { label: 'Edit', key: 'edit' },
-        { label: 'Delete', key: 'delete' },
+        { label: 'Delete', key: 'delete' }
       ],
       initialText: this.note?.text || '',
-      initialTags: this.note?.tags ? [...this.note.tags] : [],
+      initialTags: this.note?.tags ? [...this.note.tags] : []
     }
   },
   computed: {
@@ -245,29 +237,158 @@ export default {
       return !!this.parentNote
     },
     showReplyBlock() {
-      return this.reply && !this.isReplyNote
+      return this.reply && !this.isReplyNote && !this.hideReplyBlock
     },
     isDeleted() {
-      // Check if `note` is defined before accessing `deletedAt`
       return this.note && this.note.deletedAt
-    },
+    }
   },
-  watch: {
-    mode(newVal) {
-      if (newVal === 'edit') {
-        this.editingState = true
-        this.initialText = this.text
-        this.initialTags = [...this.tags]
-      } else if (newVal === 'view') {
-        this.editingState = false
+  setup(props) {
+    // Intersection Observer reference
+    const noteRef = ref(null)
+    const isNoteVisible = ref(false)
+    let intersectionObserver = null
+
+    // We'll store the interval info in a reactive object
+    // so we can attach metadata safely.
+    const refreshInterval = ref({
+      id: null,
+      updateSec: 0
+    })
+
+    const displayedTime = ref('')
+
+    // Determine how frequently to refresh
+    function getUpdateIntervalSeconds(createdAt) {
+      if (!createdAt) return 0
+
+      const now = new Date()
+      const created = new Date(createdAt)
+      let diff = now - created
+      if (diff < 0) diff = 0
+      const diffSeconds = Math.floor(diff / 1000)
+
+      if (diffSeconds < 60) {
+        return 6
+      } 
+      else if (diffSeconds < 360) {
+        return 60
+      } 
+      else if (diffSeconds < 86400) {
+        return 3600
+      } 
+      else {
+        return 0
       }
-    },
-  },
-  setup() {
-    const dialog = useDialog()
-    return { dialog }
+    }
+
+    // Format time
+    function formatTime(createdAt) {
+      if (!createdAt) return ''
+      const now = new Date()
+      const created = new Date(createdAt)
+      let diff = now - created
+      if (diff < 0) diff = 0
+      const diffSeconds = Math.floor(diff / 1000)
+      const minutes = Math.floor(diffSeconds / 60)
+      const hours = Math.floor(minutes / 60)
+      const days = Math.floor(hours / 24)
+      const years = now.getFullYear() - created.getFullYear()
+
+      if (diffSeconds <= 3) {
+        return 'just now'
+      } else if (diffSeconds < 60) {
+        return `${diffSeconds} seconds ago`
+      } else if (minutes < 60) {
+        return `${minutes} minutes ago`
+      } else if (hours < 24) {
+        return `${hours} hours ago`
+      } else if (days < 30) {
+        return `${days} days ago`
+      } else if (years < 1) {
+        return created.toLocaleDateString(undefined, {
+          month: 'long',
+          day: 'numeric'
+        })
+      } else {
+        return created.toLocaleDateString(undefined, {
+          month: 'long',
+          year: 'numeric'
+        })
+      }
+    }
+
+    function refreshDisplayedTime() {
+      displayedTime.value = formatTime(props.note.createdAt)
+      // Decide if we need to keep auto-updating
+      const intervalSeconds = getUpdateIntervalSeconds(props.note.createdAt)
+      // If note not visible or no auto-updates needed, clear interval
+      if (!isNoteVisible.value || intervalSeconds === 0) {
+        clearAutoRefresh()
+        return
+      }
+
+      // If we already have the correct interval set, do nothing
+      if (refreshInterval.value.id && refreshInterval.value.updateSec === intervalSeconds) {
+        return
+      }
+
+      // Otherwise, set a new interval
+      clearAutoRefresh() // Clear any existing interval
+      const ms = intervalSeconds * 1000
+      const newId = setInterval(() => {
+        displayedTime.value = formatTime(props.note.createdAt)
+        // If crossing a threshold, reevaluate
+        refreshDisplayedTime()
+      }, ms)
+
+      refreshInterval.value = {
+        id: newId,
+        updateSec: intervalSeconds
+      }
+    }
+
+    function clearAutoRefresh() {
+      if (refreshInterval.value.id) {
+        clearInterval(refreshInterval.value.id)
+        refreshInterval.value.id = null
+        refreshInterval.value.updateSec = 0
+      }
+    }
+
+    onMounted(() => {
+      displayedTime.value = formatTime(props.note.createdAt)
+
+      intersectionObserver = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (entry.target === noteRef.value) {
+            isNoteVisible.value = entry.isIntersecting
+            refreshDisplayedTime()
+          }
+        })
+      })
+
+      if (noteRef.value) {
+        intersectionObserver.observe(noteRef.value)
+      }
+    })
+
+    onUnmounted(() => {
+      if (intersectionObserver && noteRef.value) {
+        intersectionObserver.unobserve(noteRef.value)
+      }
+      clearAutoRefresh()
+    })
+
+    return {
+      noteRef,
+      displayedTime,
+      isNoteVisible
+    }
   },
   methods: {
+    // --- The rest of your methods (handleReplyClick, handleSave, etc.) ---
+    // They remain the same as before, no changes needed there.
     switchToEditMode() {
       this.editingState = true
       this.isPlaceholder = false
@@ -297,7 +418,7 @@ export default {
       const noteData = {
         text: this.text,
         tags: this.tags,
-        parentId: this.reply ? this.reply.id : null,
+        parentId: this.reply ? this.reply.id : null
       }
       this.$emit('unsaved-changes', false)
       if (this.mode === 'edit' || this.note.id) {
@@ -316,15 +437,15 @@ export default {
     },
     handleCancelClick() {
       if (this.hasUnsavedChanges) {
-        this.dialog.warning({
+        this.$refs.warningDialog?.destroy()
+        this.$dialog?.warning({
           title: 'Unsaved Changes',
-          content:
-            'Changes you made may not be saved. Do you want to continue?',
+          content: 'Changes you made may not be saved. Do you want to continue?',
           positiveText: 'Yes',
           negativeText: 'No',
           onPositiveClick: () => {
             this.discardChanges()
-          },
+          }
         })
       } else {
         this.discardChanges()
@@ -346,14 +467,14 @@ export default {
       }
     },
     handleRemoveReply() {
-      this.dialog.warning({
+      this.$dialog?.warning({
         title: 'Confirm Removal',
         content: 'Are you sure you want to remove the reply?',
         positiveText: 'Yes',
         negativeText: 'No',
         onPositiveClick: () => {
           this.reply = null
-        },
+        }
       })
     },
     handleRestoreClick() {
@@ -364,16 +485,14 @@ export default {
     },
     updateText(value) {
       this.text = value
-    },
-  },
+    }
+  }
 }
 </script>
 
 <style scoped>
-/* Removed the .note class styles */
-
 .note-content {
-  /* No changes needed here */
+  position: relative; /* so the note overlay can position absolutely */
 }
 
 .blurred {
