@@ -267,16 +267,18 @@ export default {
     const formatTime = (createdAt) => {
       const now = new Date()
       const created = new Date(createdAt)
-      const diff = now - created
-
-      const seconds = Math.floor(diff / 1000)
-      const minutes = Math.floor(seconds / 60)
+      let diff = now - created
+      if (diff < 0) diff = 0
+      const diffSeconds = Math.floor(diff / 1000)
+      const minutes = Math.floor(diffSeconds / 60)
       const hours = Math.floor(minutes / 60)
       const days = Math.floor(hours / 24)
       const years = now.getFullYear() - created.getFullYear()
 
-      if (seconds < 60) {
-        return `${seconds} seconds ago`
+      if (diffSeconds <= 3) {
+        return 'just now'
+      } else if (diffSeconds < 60) {
+        return `${diffSeconds} seconds ago`
       } else if (minutes < 60) {
         return `${minutes} minutes ago`
       } else if (hours < 24) {
