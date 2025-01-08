@@ -1,30 +1,22 @@
 <template>
   <div ref="noteRef">
-    <!-- Placeholder for Create Mode -->
     <div v-if="isPlaceholder">
       <div class="note-placeholder" @click="switchToEditMode">
         Enter text...
       </div>
     </div>
 
-    <!-- Edit/Create Mode -->
     <div v-else-if="isEditing">
       <div class="note-content">
-        <!-- Reply Block (Hide in Reply Edit Mode) -->
         <div v-if="showReplyBlock" class="note-reply">
           <span class="note-reply-link" @click="handleReplyClick(reply)">
             {{ reply.textPreview }}
           </span>
-          <n-icon
-            size="20"
-            class="note-reply-remove-icon"
-            @click="handleRemoveReply"
-          >
+          <n-icon size="20" class="note-reply-remove-icon" @click="handleRemoveReply">
             <CloseIcon />
           </n-icon>
         </div>
 
-        <!-- Note Text Input -->
         <n-input
           :value="text"
           type="textarea"
@@ -36,23 +28,16 @@
           @input="emitInput"
         />
 
-        <!-- Character Count -->
         <div v-if="showCharacterCount" class="character-count">
           {{ text.length }} / {{ CHARACTER_LIMIT }}
         </div>
 
-        <!-- Tags Input -->
         <TagInput v-model="tags" />
 
-        <!-- Save and Cancel Buttons -->
         <div class="note-footer">
           <div class="note-footer-buttons">
             <n-button @click="handleCancelClick">Cancel</n-button>
-            <n-button
-              type="primary"
-              :disabled="text.length > CHARACTER_LIMIT"
-              @click="handleSave"
-            >
+            <n-button type="primary" :disabled="text.length > CHARACTER_LIMIT" @click="handleSave">
               {{ mode === 'edit' ? 'Update' : 'Create' }}
             </n-button>
           </div>
@@ -60,7 +45,6 @@
       </div>
     </div>
 
-    <!-- View Mode -->
     <div v-else>
       <div :class="['note-content', { blurred: isDeleted }]">
         <div v-if="note.parentId" class="note-reply">
@@ -68,47 +52,25 @@
             {{ note.parentTextPreview }}
           </span>
         </div>
-        <div class="note-text">
-          {{ note.text }}
-        </div>
+        <div class="note-text">{{ note.text }}</div>
         <div v-if="note.tags" class="note-tags">
-          <n-button
-            v-for="tag in note.tags"
-            :key="tag"
-            size="small"
-            round
-            class="custom-tag"
-          >
+          <n-button v-for="tag in note.tags" :key="tag" size="small" round class="custom-tag">
             {{ tag }}
           </n-button>
         </div>
         <div class="note-footer">
           <div class="note-time clickable-link" @click="handleTimeClick(note)">
             {{ displayedTime }}
-            <span v-if="note.createdAt !== note.modifiedAt" class="note-edited">
-              (edited)
-            </span>
+            <span v-if="note.createdAt !== note.modifiedAt" class="note-edited">(edited)</span>
           </div>
           <div class="note-stats">
-            <n-button
-              v-if="note.replyCount > 0"
-              text
-              class="inline-flex items-center faded-text"
-              @click="handleChatClick(note)"
-            >
+            <n-button v-if="note.replyCount > 0" text class="inline-flex items-center faded-text" @click="handleChatClick(note)">
               <n-icon class="icon-margin faded-text">
                 <ReplyIcon />
               </n-icon>
-              <span class="faded-text">
-                {{ note.replyCount }}
-              </span>
+              <span class="faded-text">{{ note.replyCount }}</span>
             </n-button>
-            <n-dropdown
-              trigger="click"
-              placement="bottom-end"
-              :options="dropdownOptions"
-              @select="handleDropdownCommand"
-            >
+            <n-dropdown trigger="click" placement="bottom-end" :options="dropdownOptions" @select="handleDropdownCommand">
               <n-button text class="inline-flex items-center faded-text">
                 <n-icon><MoreIcon /></n-icon>
               </n-button>
@@ -120,12 +82,7 @@
       <div v-if="isDeleted" class="note-overlay">
         <div class="note-overlay-content">
           <div class="note-deleted-text">Note was deleted</div>
-          <n-button
-            size="small"
-            class="note-deleted-cancel"
-            @click="handleRestoreClick"
-            >Restore</n-button
-          >
+          <n-button size="small" class="note-deleted-cancel" @click="handleRestoreClick">Restore</n-button>
         </div>
       </div>
     </div>
@@ -134,18 +91,76 @@
 
 <script>
 import { ref, onMounted, onUnmounted } from 'vue'
-import {
-  NButton,
-  NIcon,
-  NDropdown,
-  NInput,
-} from 'naive-ui'
-import {
-  ArrowUndoOutline as ReplyIcon,
-  EllipsisVerticalOutline as MoreIcon,
-  Close as CloseIcon
-} from '@vicons/ionicons5'
+import { NButton, NIcon, NDropdown, NInput } from 'naive-ui'
+import { ArrowUndoOutline as ReplyIcon, EllipsisVerticalOutline as MoreIcon, Close as CloseIcon } from '@vicons/ionicons5'
 import TagInput from './TagInput.vue'
+
+function isSameDay(date1, date2) {
+  return date1.getFullYear() === date2.getFullYear() &&
+    date1.getMonth() === date2.getMonth() &&
+    date1.getDate() === date2.getDate()
+}
+
+function isYesterday(currentDate, noteDate) {
+  const yesterday = new Date(currentDate)
+  yesterday.setDate(currentDate.getDate() - 1)
+  return isSameDay(yesterday, noteDate)
+}
+
+function isSameYear(date1, date2) {
+  return date1.getFullYear() === date2.getFullYear()
+}
+
+function differenceInSeconds(date1, date2) {
+  return Math.floor((date1 - date2) / 1000)
+}
+
+function differenceInMinutes(date1, date2) {
+  return Math.floor((date1 - date2) / (1000 * 60))
+}
+
+function formatTime(noteDateString) {
+  if (!noteDateString) return ''
+  const noteDate = new Date(noteDateString)
+  const currentDate = new Date()
+
+  const secDiff = differenceInSeconds(currentDate, noteDate)
+  const minDiff = differenceInMinutes(currentDate, noteDate)
+
+  if (secDiff < 3) {
+    return 'Just now'
+  }
+  if (secDiff < 60) {
+    return `${secDiff} seconds ago`
+  }
+  if (minDiff < 60) {
+    return `${minDiff} minutes ago`
+  }
+  if (isSameDay(currentDate, noteDate)) {
+    const hh = String(noteDate.getHours()).padStart(2, '0')
+    const mm = String(noteDate.getMinutes()).padStart(2, '0')
+    return `Today, ${hh}:${mm}`
+  }
+  if (isYesterday(currentDate, noteDate)) {
+    const hh = String(noteDate.getHours()).padStart(2, '0')
+    const mm = String(noteDate.getMinutes()).padStart(2, '0')
+    return `Yesterday, ${hh}:${mm}`
+  }
+  if (isSameYear(currentDate, noteDate)) {
+    const month = String(noteDate.getMonth() + 1).padStart(2, '0')
+    const day = String(noteDate.getDate()).padStart(2, '0')
+    const hh = String(noteDate.getHours()).padStart(2, '0')
+    const mm = String(noteDate.getMinutes()).padStart(2, '0')
+    return `${month}/${day}, ${hh}:${mm}`
+  }
+
+  const year = noteDate.getFullYear()
+  const month = String(noteDate.getMonth() + 1).padStart(2, '0')
+  const day = String(noteDate.getDate()).padStart(2, '0')
+  const hh = String(noteDate.getHours()).padStart(2, '0')
+  const mm = String(noteDate.getMinutes()).padStart(2, '0')
+  return `${year}/${month}/${day}, ${hh}:${mm}`
+}
 
 export default {
   name: 'NoteItem',
@@ -160,62 +175,24 @@ export default {
     TagInput
   },
   props: {
-    mode: {
-      type: String,
-      default: 'view'
-    },
-    note: {
-      type: Object,
-      default: () => ({})
-    },
-    parentNote: {
-      type: Object,
-      default: null
-    },
-    index: {
-      type: Number,
-      default: null
-    },
-    hideReplyBlock: {
-      type: Boolean,
-      default: false
-    }
+    mode: { type: String, default: 'view' },
+    note: { type: Object, default: () => ({}) },
+    parentNote: { type: Object, default: null },
+    index: { type: Number, default: null },
+    hideReplyBlock: { type: Boolean, default: false }
   },
-  emits: [
-    'reply-click',
-    'chat-click',
-    'time-click',
-    'dropdown-command',
-    'create-note',
-    'update-note',
-    'cancel-create',
-    'unsaved-changes',
-    'restore-note'
-  ],
+  emits: ['reply-click', 'chat-click', 'time-click', 'dropdown-command', 'create-note', 'update-note', 'cancel-create', 'unsaved-changes', 'restore-note'],
   data() {
     return {
       text: this.note?.text || '',
       tags: this.note?.tags ? [...this.note.tags] : [],
-      reply: this.parentNote
-        ? {
-            id: this.parentNote.id,
-            textPreview: this.parentNote.text
-          }
-        : this.note?.parentId
-          ? {
-              id: this.note.parentId,
-              textPreview: this.note.parentTextPreview
-            }
-          : null,
-      editingState:
-        this.mode === 'edit' || (this.mode === 'create' && this.parentNote),
+      reply: this.parentNote ? { id: this.parentNote.id, textPreview: this.parentNote.text }
+        : this.note?.parentId ? { id: this.note.parentId, textPreview: this.note.parentTextPreview }
+        : null,
+      editingState: this.mode === 'edit' || (this.mode === 'create' && this.parentNote),
       isPlaceholder: this.mode === 'create' && !this.parentNote,
       CHARACTER_LIMIT: 1000,
-      dropdownOptions: [
-        { label: 'Reply', key: 'reply' },
-        { label: 'Edit', key: 'edit' },
-        { label: 'Delete', key: 'delete' }
-      ],
+      dropdownOptions: [{ label: 'Reply', key: 'reply' }, { label: 'Edit', key: 'edit' }, { label: 'Delete', key: 'delete' }],
       initialText: this.note?.text || '',
       initialTags: this.note?.tags ? [...this.note.tags] : []
     }
@@ -228,10 +205,7 @@ export default {
       return this.text.length >= this.CHARACTER_LIMIT * 0.8
     },
     hasUnsavedChanges() {
-      return (
-        this.text !== this.initialText ||
-        JSON.stringify(this.tags) !== JSON.stringify(this.initialTags)
-      )
+      return this.text !== this.initialText || JSON.stringify(this.tags) !== JSON.stringify(this.initialTags)
     },
     isReplyNote() {
       return !!this.parentNote
@@ -244,140 +218,16 @@ export default {
     }
   },
   setup(props) {
-    // Intersection Observer reference
     const noteRef = ref(null)
     const isNoteVisible = ref(false)
-    let intersectionObserver = null
-
-    // We'll store the interval info in a reactive object
-    // so we can attach metadata safely.
-    const refreshInterval = ref({
-      id: null,
-      updateSec: 0
-    })
-
     const displayedTime = ref('')
-
-    // Determine how frequently to refresh
-    function getUpdateIntervalSeconds(createdAt) {
-      if (!createdAt) return 0
-
-      const now = new Date()
-      const created = new Date(createdAt)
-      let diff = now - created
-      if (diff < 0) diff = 0
-      const diffSeconds = Math.floor(diff / 1000)
-
-      if (diffSeconds < 60) {
-        return 6
-      } 
-      else if (diffSeconds < 360) {
-        return 60
-      } 
-      else if (diffSeconds < 86400) {
-        return 3600
-      } 
-      else {
-        return 0
-      }
-    }
-
-    // Format time
-    function formatTime(createdAt) {
-      if (!createdAt) return ''
-      const now = new Date()
-      const created = new Date(createdAt)
-      let diff = now - created
-      if (diff < 0) diff = 0
-      const diffSeconds = Math.floor(diff / 1000)
-      const minutes = Math.floor(diffSeconds / 60)
-      const hours = Math.floor(minutes / 60)
-      const days = Math.floor(hours / 24)
-      const years = now.getFullYear() - created.getFullYear()
-
-      if (diffSeconds <= 3) {
-        return 'just now'
-      } else if (diffSeconds < 60) {
-        return `${diffSeconds} seconds ago`
-      } else if (minutes < 60) {
-        return `${minutes} minutes ago`
-      } else if (hours < 24) {
-        return `${hours} hours ago`
-      } else if (days < 30) {
-        return `${days} days ago`
-      } else if (years < 1) {
-        return created.toLocaleDateString(undefined, {
-          month: 'long',
-          day: 'numeric'
-        })
-      } else {
-        return created.toLocaleDateString(undefined, {
-          month: 'long',
-          year: 'numeric'
-        })
-      }
-    }
-
-    function refreshDisplayedTime() {
-      displayedTime.value = formatTime(props.note.createdAt)
-      // Decide if we need to keep auto-updating
-      const intervalSeconds = getUpdateIntervalSeconds(props.note.createdAt)
-      // If note not visible or no auto-updates needed, clear interval
-      if (!isNoteVisible.value || intervalSeconds === 0) {
-        clearAutoRefresh()
-        return
-      }
-
-      // If we already have the correct interval set, do nothing
-      if (refreshInterval.value.id && refreshInterval.value.updateSec === intervalSeconds) {
-        return
-      }
-
-      // Otherwise, set a new interval
-      clearAutoRefresh() // Clear any existing interval
-      const ms = intervalSeconds * 1000
-      const newId = setInterval(() => {
-        displayedTime.value = formatTime(props.note.createdAt)
-        // If crossing a threshold, reevaluate
-        refreshDisplayedTime()
-      }, ms)
-
-      refreshInterval.value = {
-        id: newId,
-        updateSec: intervalSeconds
-      }
-    }
-
-    function clearAutoRefresh() {
-      if (refreshInterval.value.id) {
-        clearInterval(refreshInterval.value.id)
-        refreshInterval.value.id = null
-        refreshInterval.value.updateSec = 0
-      }
-    }
 
     onMounted(() => {
       displayedTime.value = formatTime(props.note.createdAt)
-
-      intersectionObserver = new IntersectionObserver((entries) => {
-        entries.forEach((entry) => {
-          if (entry.target === noteRef.value) {
-            isNoteVisible.value = entry.isIntersecting
-            refreshDisplayedTime()
-          }
-        })
-      })
-
-      if (noteRef.value) {
-        intersectionObserver.observe(noteRef.value)
-      }
     })
 
     onUnmounted(() => {
-      if (intersectionObserver && noteRef.value) {
-        intersectionObserver.unobserve(noteRef.value)
-      }
-      clearAutoRefresh()
+      isNoteVisible.value = false
     })
 
     return {
@@ -387,8 +237,6 @@ export default {
     }
   },
   methods: {
-    // --- The rest of your methods (handleReplyClick, handleSave, etc.) ---
-    // They remain the same as before, no changes needed there.
     switchToEditMode() {
       this.editingState = true
       this.isPlaceholder = false
@@ -437,16 +285,7 @@ export default {
     },
     handleCancelClick() {
       if (this.hasUnsavedChanges) {
-        this.$refs.warningDialog?.destroy()
-        this.$dialog?.warning({
-          title: 'Unsaved Changes',
-          content: 'Changes you made may not be saved. Do you want to continue?',
-          positiveText: 'Yes',
-          negativeText: 'No',
-          onPositiveClick: () => {
-            this.discardChanges()
-          }
-        })
+        this.discardChanges()
       } else {
         this.discardChanges()
       }
@@ -467,21 +306,10 @@ export default {
       }
     },
     handleRemoveReply() {
-      this.$dialog?.warning({
-        title: 'Confirm Removal',
-        content: 'Are you sure you want to remove the reply?',
-        positiveText: 'Yes',
-        negativeText: 'No',
-        onPositiveClick: () => {
-          this.reply = null
-        }
-      })
+      this.reply = null
     },
     handleRestoreClick() {
       this.$emit('restore-note', this.note, this.index)
-    },
-    emitInput() {
-      // For unsaved changes tracking if needed
     },
     updateText(value) {
       this.text = value
@@ -492,7 +320,7 @@ export default {
 
 <style scoped>
 .note-content {
-  position: relative; /* so the note overlay can position absolutely */
+  position: relative;
 }
 
 .blurred {
@@ -521,7 +349,6 @@ export default {
 .note-deleted-text {
   font-size: 20px;
   color: var(--text-color);
-  font-weight: normal;
 }
 
 .note-deleted-cancel {
@@ -533,33 +360,27 @@ export default {
   border-radius: 10px;
   padding: 8px;
   font-size: 14px;
-  color: var(--faded-text-color);
   display: flex;
   align-items: center;
-  justify-content: space-between;
 }
 
 .note-reply-link {
   color: inherit;
   cursor: pointer;
-  flex: 1;
 }
 
 .note-reply-remove-icon {
   cursor: pointer;
-  color: var(--faded-text-color);
   margin-left: 8px;
 }
 
 .note-text {
   font-size: 20px;
-  color: var(--text-color);
   word-break: break-word;
 }
 
 .note-tags {
   font-size: 16px;
-  color: var(--text-color);
   margin-bottom: 5px;
 }
 
@@ -567,7 +388,6 @@ export default {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 8px;
 }
 
 .note-footer-buttons {
@@ -582,21 +402,11 @@ export default {
 }
 
 .note-time {
-  color: var(--faded-text-color);
-}
-
-.clickable-link {
   cursor: pointer;
 }
 
 .custom-tag {
   background-color: var(--tag-bg-color);
-  color: var(--faded-text-color);
-  border: none;
-}
-
-.custom-tag:hover {
-  color: var(--text-color);
 }
 
 .faded-text {
@@ -607,19 +417,16 @@ export default {
   width: 100%;
   margin-top: 10px;
   font-size: 20px;
-  border-radius: 10px;
 }
 
 .character-count {
   text-align: right;
   margin-top: 5px;
   font-size: 14px;
-  color: var(--faded-text-color);
 }
 
 .note-placeholder {
   font-size: 20px;
-  color: var(--faded-text-color);
   cursor: pointer;
 }
 </style>
