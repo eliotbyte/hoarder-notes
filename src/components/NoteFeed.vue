@@ -12,7 +12,7 @@
     <!-- Notes List -->
     <div
       v-for="(note, index) in notes"
-      :key="note.id || `reply-${index}`"
+      :key="note.id || `note-${note.tempId}`"
       class="content-block"
     >
       <NoteItem
