@@ -42,7 +42,6 @@
 
           <!-- Middle Column: Selected Note + Replies -->
           <n-col :span="12">
-            <!-- CHANGED: Removed "grid gap-1" classes here -->
             <div class="grid-content p-4">
               <!-- Main Parent Note -->
               <div class="content-block" v-if="note">
@@ -52,19 +51,7 @@
                   mode="view"
                 />
               </div>
-              <!-- Reply Input -->
-              <div class="content-block" v-if="note">
-                <NoteItem
-                  :note="{}"
-                  :parent-note="note"
-                  mode="create"
-                  placeholderText="Reply to note..."
-                  @create-note="handleCreateNote"
-                  @cancel-create="handleCancelCreate"
-                />
-              </div>
               <!-- Feed of Replies -->
-              <!-- CHANGED: Added ref="noteFeedRef" -->
               <NoteFeed
                 ref="noteFeedRef"
                 :parent-id="noteId"
@@ -73,6 +60,8 @@
                 :topic-id="topicId"
                 :tags="filterTags"
                 :not-reply="notReply"
+                :show-create-note-item="true"
+                creationPlaceholder="Reply to note..."
               />
             </div>
           </n-col>
@@ -158,7 +147,7 @@ export default {
     const filterTags = ref([])
     const notReply = ref(false)
 
-    // CHANGED: Add ref to NoteFeed
+    // Reference to NoteFeed
     const noteFeedRef = ref(null)
 
     const toggleFilters = () => {
@@ -250,31 +239,6 @@ export default {
       }
     }
 
-    // CHANGED: Push new note to the feed array
-    const handleCreateNote = (noteData) => {
-      noteData.parentId = noteId
-      noteData.spaceId = note.value.spaceId
-      noteData.topicId = note.value.topicId
-      api
-        .post('/notes', noteData)
-        .then((response) => {
-          // Insert new note into feed immediately
-          if (noteFeedRef.value && noteFeedRef.value.notes) {
-            noteFeedRef.value.notes.unshift({
-              ...response.data,
-              mode: 'view'
-            })
-          }
-        })
-        .catch((error) => {
-          console.error('Error creating note:', error)
-        })
-    }
-
-    const handleCancelCreate = () => {
-      // This just toggles placeholder for the "Reply to note..." item
-    }
-
     const formatTime = (createdAt) => {
       const now = new Date()
       const created = new Date(createdAt)
@@ -327,8 +291,6 @@ export default {
       noteId,
       note,
       formatTime,
-      handleCreateNote,
-      handleCancelCreate,
       date,
 
       // Spaces & topics
@@ -344,7 +306,7 @@ export default {
       filtersExpanded,
       toggleFilters,
 
-      // CHANGED: Exporting noteFeedRef
+      // NoteFeed ref
       noteFeedRef
     }
   }
@@ -369,7 +331,6 @@ export default {
   padding: 16px;
 }
 
-/* Removed "display: grid" and "gap: 4px" from the main content block to match HoarderNotes.vue */
 .p-4 {
   padding: 16px;
 }

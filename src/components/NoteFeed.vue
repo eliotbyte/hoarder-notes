@@ -6,6 +6,7 @@
         :note="{}"
         mode="create"
         :format-time="formatTime"
+        :placeholder-text="creationPlaceholder"
         @create-note="handleCreateNote"
         @cancel-create="handleCancelCreate"
       />
@@ -77,6 +78,10 @@ export default {
     date: {
       type: String,
       default: () => new Date().toISOString().split('.')[0] + 'Z'
+    },
+    creationPlaceholder: {
+      type: String,
+      default: 'Enter text...'
     }
   },
   emits: [
@@ -149,6 +154,12 @@ export default {
     })
 
     const handleCreateNote = (noteData, index) => {
+      // If user is on a specific note page, or we have a parentId prop,
+      // we want new notes to have that parentId by default
+      if (!noteData.parentId && props.parentId) {
+        noteData.parentId = props.parentId
+      }
+
       // if this is a reply
       if (noteData.parentId) {
         const parentNote = notes.value.find((n) => n.id === noteData.parentId)
@@ -195,20 +206,9 @@ export default {
     }
 
     const handleCancelCreate = (index) => {
-      // if this was an in-line reply
       if (index !== undefined && notes.value[index] && notes.value[index].isReply) {
         notes.value.splice(index, 1)
       }
-      // If you have a top-level create note item, you usually do not keep it in the array,
-      // so nothing is needed here. But if you do keep it in notes, revert it to placeholder:
-      /*
-      else if (notes.value[index] && notes.value[index].mode === 'create') {
-        notes.value[index].text = ''
-        notes.value[index].tags = []
-        notes.value[index].reply = null
-        notes.value[index].mode = 'view' // or your placeholder
-      }
-      */
     }
 
     const handleDropdownCommand = (command, note) => {
@@ -217,10 +217,7 @@ export default {
       } else if (command === 'reply') {
         const index = notes.value.findIndex((n) => n.id === note.id)
         if (index !== -1) {
-          if (
-            !notes.value[index + 1] ||
-            notes.value[index + 1].isReply !== true
-          ) {
+          if (!notes.value[index + 1] || notes.value[index + 1].isReply !== true) {
             notes.value.splice(index + 1, 0, {
               isReply: true,
               parentNote: note,
@@ -318,7 +315,6 @@ export default {
       loadMoreNotes()
     }
 
-    // Watch for changes in props to reload the feed
     watch(
       () => [
         props.spaceId,

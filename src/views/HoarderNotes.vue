@@ -47,6 +47,7 @@
               :not-reply="notReply"
               :show-create-note-item="spaceId && topicId"
               :date="date"
+              creationPlaceholder="Enter text..."
             />
           </n-col>
           <n-col :span="6">
@@ -109,7 +110,7 @@ export default {
     HoarderHeader,
     TagInput,
     ChevronForward,
-    NoteFeed,
+    NoteFeed
   },
   setup() {
     const router = useRouter()
@@ -130,9 +131,8 @@ export default {
     const updateFiltersInQuery = () => {
       const query = {
         ...route.query,
-        tags:
-          filterTags.value.length > 0 ? filterTags.value.join(',') : undefined,
-        notReply: notReply.value ? 'true' : undefined,
+        tags: filterTags.value.length > 0 ? filterTags.value.join(',') : undefined,
+        notReply: notReply.value ? 'true' : undefined
       }
 
       // Remove undefined keys
@@ -169,9 +169,7 @@ export default {
           if (space) {
             spaceId.value = space.id
             if (route.query.topicId) {
-              const topic = space.topics.find(
-                (t) => t.id == route.query.topicId
-              )
+              const topic = space.topics.find((t) => t.id == route.query.topicId)
               if (topic) {
                 topicId.value = topic.id
               }
@@ -210,13 +208,12 @@ export default {
     })
 
     watch([spaceId, topicId], ([newSpaceId, newTopicId]) => {
-      // Update the route query parameters
       router.replace({
         query: {
           ...route.query,
           spaceId: newSpaceId,
-          topicId: newTopicId,
-        },
+          topicId: newTopicId
+        }
       })
     })
 
@@ -231,9 +228,9 @@ export default {
       filterTags,
       notReply,
       ChevronForward,
-      date,
+      date
     }
-  },
+  }
 }
 </script>
 
@@ -306,7 +303,7 @@ export default {
 
 .slide-enter-to,
 .slide-leave-from {
-  max-height: 500px; /* Adjust as needed */
+  max-height: 500px;
   opacity: 1;
 }
 
