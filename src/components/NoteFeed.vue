@@ -7,6 +7,7 @@
         mode="create"
         :format-time="formatTime"
         @create-note="handleCreateNote"
+        @cancel-create="handleCancelCreate"
       />
     </div>
     <!-- Notes List -->
@@ -46,37 +47,37 @@ import api from '@/utils/api.js'
 export default {
   name: 'NoteFeed',
   components: {
-    NoteItem,
+    NoteItem
   },
   props: {
     spaceId: {
       type: Number,
-      default: null,
+      default: null
     },
     topicId: {
       type: Number,
-      default: null,
+      default: null
     },
     parentId: {
       type: Number,
-      default: null,
+      default: null
     },
     tags: {
       type: Array,
-      default: () => [],
+      default: () => []
     },
     notReply: {
       type: Boolean,
-      default: false,
+      default: false
     },
     showCreateNoteItem: {
       type: Boolean,
-      default: false,
+      default: false
     },
     date: {
       type: String,
-      default: () => new Date().toISOString().split('.')[0] + 'Z',
-    },
+      default: () => new Date().toISOString().split('.')[0] + 'Z'
+    }
   },
   emits: [
     'reply-click',
@@ -84,7 +85,7 @@ export default {
     'time-click',
     'create-note',
     'update-note',
-    'cancel-create',
+    'cancel-create'
   ],
   setup(props) {
     const router = useRouter()
@@ -107,7 +108,7 @@ export default {
         const params = {
           page: page.value,
           pageSize: pageSize.value,
-          date: props.date,
+          date: props.date
         }
         if (props.spaceId) {
           params.spaceId = props.spaceId
@@ -144,18 +145,18 @@ export default {
 
     useInfiniteScroll(window, loadMoreNotes, {
       distance: 100,
-      immediate: false,
+      immediate: false
     })
 
     const handleCreateNote = (noteData, index) => {
+      // if this is a reply
       if (noteData.parentId) {
-        // This is a reply note, get spaceId and topicId from the parent note
         const parentNote = notes.value.find((n) => n.id === noteData.parentId)
         if (parentNote) {
           noteData.spaceId = parentNote.spaceId
           noteData.topicId = parentNote.topicId
         } else {
-          // Fallback to current spaceId and topicId
+          // fallback
           noteData.spaceId = props.spaceId
           noteData.topicId = props.topicId
         }
@@ -166,9 +167,11 @@ export default {
       api
         .post('/notes', noteData)
         .then((response) => {
+          // If we were replying in-place:
           if (notes.value[index] && notes.value[index].isReply) {
             notes.value.splice(index, 1, { ...response.data, mode: 'view' })
           } else {
+            // Put new note at the top
             notes.value.unshift({ ...response.data, mode: 'view' })
           }
         })
@@ -192,9 +195,20 @@ export default {
     }
 
     const handleCancelCreate = (index) => {
-      if (notes.value[index].isReply) {
+      // if this was an in-line reply
+      if (index !== undefined && notes.value[index] && notes.value[index].isReply) {
         notes.value.splice(index, 1)
       }
+      // If you have a top-level create note item, you usually do not keep it in the array,
+      // so nothing is needed here. But if you do keep it in notes, revert it to placeholder:
+      /*
+      else if (notes.value[index] && notes.value[index].mode === 'create') {
+        notes.value[index].text = ''
+        notes.value[index].tags = []
+        notes.value[index].reply = null
+        notes.value[index].mode = 'view' // or your placeholder
+      }
+      */
     }
 
     const handleDropdownCommand = (command, note) => {
@@ -211,7 +225,7 @@ export default {
               isReply: true,
               parentNote: note,
               mode: 'create',
-              note: {},
+              note: {}
             })
           }
         }
@@ -223,7 +237,7 @@ export default {
           negativeText: 'No',
           onPositiveClick: () => {
             deleteNote(note)
-          },
+          }
         })
       }
     }
@@ -231,7 +245,6 @@ export default {
     const deleteNote = async (note) => {
       try {
         await api.delete(`/notes/${note.id}`)
-        // Update the note's deletedAt property
         const index = notes.value.findIndex((n) => n.id === note.id)
         if (index !== -1) {
           notes.value[index].deletedAt = new Date().toISOString()
@@ -288,12 +301,12 @@ export default {
       } else if (years < 1) {
         return created.toLocaleDateString(undefined, {
           month: 'long',
-          day: 'numeric',
+          day: 'numeric'
         })
       } else {
         return created.toLocaleDateString(undefined, {
           month: 'long',
-          year: 'numeric',
+          year: 'numeric'
         })
       }
     }
@@ -313,7 +326,7 @@ export default {
         props.parentId,
         props.tags,
         props.notReply,
-        props.date,
+        props.date
       ],
       () => {
         resetFeed()
@@ -335,9 +348,9 @@ export default {
       handleReplyClick,
       handleChatClick,
       handleTimeClick,
-      formatTime,
+      formatTime
     }
-  },
+  }
 }
 </script>
 

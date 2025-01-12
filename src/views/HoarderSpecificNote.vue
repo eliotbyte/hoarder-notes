@@ -42,7 +42,8 @@
 
           <!-- Middle Column: Selected Note + Replies -->
           <n-col :span="12">
-            <div class="grid-content p-4 grid gap-1">
+            <!-- CHANGED: Removed "grid gap-1" classes here -->
+            <div class="grid-content p-4">
               <!-- Main Parent Note -->
               <div class="content-block" v-if="note">
                 <NoteItem
@@ -57,11 +58,15 @@
                   :note="{}"
                   :parent-note="note"
                   mode="create"
+                  placeholderText="Reply to note..."
                   @create-note="handleCreateNote"
+                  @cancel-create="handleCancelCreate"
                 />
               </div>
               <!-- Feed of Replies -->
+              <!-- CHANGED: Added ref="noteFeedRef" -->
               <NoteFeed
+                ref="noteFeedRef"
                 :parent-id="noteId"
                 :date="date"
                 :space-id="spaceId"
@@ -95,7 +100,9 @@
                       <!-- Tag Input -->
                       <TagInput v-model="filterTags" />
                       <!-- Not Reply Checkbox -->
-                      <n-checkbox v-model:checked="notReply">Not Reply</n-checkbox>
+                      <n-checkbox v-model:checked="notReply">
+                        Not Reply
+                      </n-checkbox>
                     </div>
                   </transition>
                 </div>
@@ -132,7 +139,7 @@ export default {
     NoteItem,
     NoteFeed,
     TagInput,
-    ChevronForward,
+    ChevronForward
   },
   setup() {
     const route = useRoute()
@@ -151,6 +158,9 @@ export default {
     const filterTags = ref([])
     const notReply = ref(false)
 
+    // CHANGED: Add ref to NoteFeed
+    const noteFeedRef = ref(null)
+
     const toggleFilters = () => {
       filtersExpanded.value = !filtersExpanded.value
     }
@@ -158,9 +168,8 @@ export default {
     const updateFiltersInQuery = () => {
       const query = {
         ...route.query,
-        tags:
-          filterTags.value.length > 0 ? filterTags.value.join(',') : undefined,
-        notReply: notReply.value ? 'true' : undefined,
+        tags: filterTags.value.length > 0 ? filterTags.value.join(',') : undefined,
+        notReply: notReply.value ? 'true' : undefined
       }
       Object.keys(query).forEach(
         (key) => query[key] === undefined && delete query[key]
@@ -221,8 +230,8 @@ export default {
         query: {
           ...route.query,
           spaceId: newSpaceId,
-          topicId: newTopicId,
-        },
+          topicId: newTopicId
+        }
       })
     })
 
@@ -241,19 +250,29 @@ export default {
       }
     }
 
+    // CHANGED: Push new note to the feed array
     const handleCreateNote = (noteData) => {
       noteData.parentId = noteId
       noteData.spaceId = note.value.spaceId
       noteData.topicId = note.value.topicId
       api
         .post('/notes', noteData)
-        .then(() => {
-          // Reload or handle the new reply
-          window.location.reload()
+        .then((response) => {
+          // Insert new note into feed immediately
+          if (noteFeedRef.value && noteFeedRef.value.notes) {
+            noteFeedRef.value.notes.unshift({
+              ...response.data,
+              mode: 'view'
+            })
+          }
         })
         .catch((error) => {
           console.error('Error creating note:', error)
         })
+    }
+
+    const handleCancelCreate = () => {
+      // This just toggles placeholder for the "Reply to note..." item
     }
 
     const formatTime = (createdAt) => {
@@ -280,19 +299,18 @@ export default {
       } else if (years < 1) {
         return created.toLocaleDateString(undefined, {
           month: 'long',
-          day: 'numeric',
+          day: 'numeric'
         })
       } else {
         return created.toLocaleDateString(undefined, {
           month: 'long',
-          year: 'numeric',
+          year: 'numeric'
         })
       }
     }
 
     onMounted(() => {
       loadSpaces()
-      // Set filters from query
       if (route.query.tags) {
         filterTags.value = route.query.tags.split(',')
       }
@@ -310,6 +328,7 @@ export default {
       note,
       formatTime,
       handleCreateNote,
+      handleCancelCreate,
       date,
 
       // Spaces & topics
@@ -324,8 +343,11 @@ export default {
       notReply,
       filtersExpanded,
       toggleFilters,
+
+      // CHANGED: Exporting noteFeedRef
+      noteFeedRef
     }
-  },
+  }
 }
 </script>
 
@@ -347,16 +369,9 @@ export default {
   padding: 16px;
 }
 
+/* Removed "display: grid" and "gap: 4px" from the main content block to match HoarderNotes.vue */
 .p-4 {
   padding: 16px;
-}
-
-.grid {
-  display: grid;
-}
-
-.gap-1 {
-  gap: 4px;
 }
 
 .spaces-list {

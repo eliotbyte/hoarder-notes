@@ -2,7 +2,7 @@
   <div ref="noteRef">
     <div v-if="isPlaceholder">
       <div class="note-placeholder" @click="switchToEditMode">
-        Enter text...
+        {{ placeholderText }}
       </div>
     </div>
 
@@ -20,7 +20,7 @@
         <n-input
           :value="text"
           type="textarea"
-          placeholder="Enter text..."
+          :placeholder="placeholderText"
           autosize
           :maxlength="CHARACTER_LIMIT"
           class="note-text-input"
@@ -38,7 +38,7 @@
           <div class="note-footer-buttons">
             <n-button @click="handleCancelClick">Cancel</n-button>
             <n-button type="primary" :disabled="text.length > CHARACTER_LIMIT" @click="handleSave">
-              {{ mode === 'edit' ? 'Update' : 'Create' }}
+              {{ mode === 'edit' ? 'Update' : (isReplyNote ? 'Reply' : 'Create') }}
             </n-button>
           </div>
         </div>
@@ -64,13 +64,23 @@
             <span v-if="note.createdAt !== note.modifiedAt" class="note-edited">(edited)</span>
           </div>
           <div class="note-stats">
-            <n-button v-if="note.replyCount > 0" text class="inline-flex items-center faded-text" @click="handleChatClick(note)">
+            <n-button
+              v-if="note.replyCount > 0"
+              text
+              class="inline-flex items-center faded-text"
+              @click="handleChatClick(note)"
+            >
               <n-icon class="icon-margin faded-text">
                 <ReplyIcon />
               </n-icon>
               <span class="faded-text">{{ note.replyCount }}</span>
             </n-button>
-            <n-dropdown trigger="click" placement="bottom-end" :options="dropdownOptions" @select="handleDropdownCommand">
+            <n-dropdown
+              trigger="click"
+              placement="bottom-end"
+              :options="dropdownOptions"
+              @select="handleDropdownCommand"
+            >
               <n-button text class="inline-flex items-center faded-text">
                 <n-icon><MoreIcon /></n-icon>
               </n-button>
@@ -82,7 +92,9 @@
       <div v-if="isDeleted" class="note-overlay">
         <div class="note-overlay-content">
           <div class="note-deleted-text">Note was deleted</div>
-          <n-button size="small" class="note-deleted-cancel" @click="handleRestoreClick">Restore</n-button>
+          <n-button size="small" class="note-deleted-cancel" @click="handleRestoreClick">
+            Restore
+          </n-button>
         </div>
       </div>
     </div>
@@ -92,13 +104,19 @@
 <script>
 import { ref, onMounted, onUnmounted } from 'vue'
 import { NButton, NIcon, NDropdown, NInput } from 'naive-ui'
-import { ArrowUndoOutline as ReplyIcon, EllipsisVerticalOutline as MoreIcon, Close as CloseIcon } from '@vicons/ionicons5'
+import {
+  ArrowUndoOutline as ReplyIcon,
+  EllipsisVerticalOutline as MoreIcon,
+  Close as CloseIcon
+} from '@vicons/ionicons5'
 import TagInput from './TagInput.vue'
 
 function isSameDay(date1, date2) {
-  return date1.getFullYear() === date2.getFullYear() &&
+  return (
+    date1.getFullYear() === date2.getFullYear() &&
     date1.getMonth() === date2.getMonth() &&
     date1.getDate() === date2.getDate()
+  )
 }
 
 function isYesterday(currentDate, noteDate) {
@@ -179,20 +197,42 @@ export default {
     note: { type: Object, default: () => ({}) },
     parentNote: { type: Object, default: null },
     index: { type: Number, default: null },
-    hideReplyBlock: { type: Boolean, default: false }
+    hideReplyBlock: { type: Boolean, default: false },
+    placeholderText: {
+      type: String,
+      default: 'Enter text...'
+    }
   },
-  emits: ['reply-click', 'chat-click', 'time-click', 'dropdown-command', 'create-note', 'update-note', 'cancel-create', 'unsaved-changes', 'restore-note'],
+  emits: [
+    'reply-click',
+    'chat-click',
+    'time-click',
+    'dropdown-command',
+    'create-note',
+    'update-note',
+    'cancel-create',
+    'unsaved-changes',
+    'restore-note'
+  ],
   data() {
     return {
       text: this.note?.text || '',
       tags: this.note?.tags ? [...this.note.tags] : [],
-      reply: this.parentNote ? { id: this.parentNote.id, textPreview: this.parentNote.text }
-        : this.note?.parentId ? { id: this.note.parentId, textPreview: this.note.parentTextPreview }
+      reply: this.parentNote
+        ? { id: this.parentNote.id, textPreview: this.parentNote.text }
+        : this.note?.parentId
+        ? { id: this.note.parentId, textPreview: this.note.parentTextPreview }
         : null,
-      editingState: this.mode === 'edit' || (this.mode === 'create' && this.parentNote),
-      isPlaceholder: this.mode === 'create' && !this.parentNote,
+      // We remove automatic edit mode for replies:
+      editingState: this.mode === 'edit',
+      // For create mode, show placeholder first
+      isPlaceholder: this.mode === 'create',
       CHARACTER_LIMIT: 1000,
-      dropdownOptions: [{ label: 'Reply', key: 'reply' }, { label: 'Edit', key: 'edit' }, { label: 'Delete', key: 'delete' }],
+      dropdownOptions: [
+        { label: 'Reply', key: 'reply' },
+        { label: 'Edit', key: 'edit' },
+        { label: 'Delete', key: 'delete' }
+      ],
       initialText: this.note?.text || '',
       initialTags: this.note?.tags ? [...this.note.tags] : []
     }
@@ -205,12 +245,16 @@ export default {
       return this.text.length >= this.CHARACTER_LIMIT * 0.8
     },
     hasUnsavedChanges() {
-      return this.text !== this.initialText || JSON.stringify(this.tags) !== JSON.stringify(this.initialTags)
+      return (
+        this.text !== this.initialText ||
+        JSON.stringify(this.tags) !== JSON.stringify(this.initialTags)
+      )
     },
     isReplyNote() {
       return !!this.parentNote
     },
     showReplyBlock() {
+      // We keep the old check, but remove forced editing
       return this.reply && !this.isReplyNote && !this.hideReplyBlock
     },
     isDeleted() {
@@ -312,6 +356,9 @@ export default {
       this.$emit('restore-note', this.note, this.index)
     },
     updateText(value) {
+      this.text = value
+    },
+    emitInput(value) {
       this.text = value
     }
   }
